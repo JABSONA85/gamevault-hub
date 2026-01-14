@@ -5,15 +5,23 @@ import { Gamepad2, Lock, Mail, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAdmin } from '@/context/AdminContext';
+import { useAuth } from '@/context/AuthContext';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { isAdmin, login } = useAdmin();
+  const { isAdmin, isLoading: authLoading, signIn } = useAuth();
   const navigate = useNavigate();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin w-8 h-8 border-2 border-neon-cyan border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   if (isAdmin) {
     return <Navigate to="/admin" replace />;
@@ -24,13 +32,13 @@ const AdminLogin = () => {
     setError('');
     setIsLoading(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const success = login(email, password);
-    if (success) {
-      navigate('/admin');
+    const { error } = await signIn(email, password);
+    
+    if (error) {
+      setError(error.message || 'Invalid credentials');
     } else {
-      setError('Invalid credentials. Try admin@gamevault.com / admin123');
+      // Check if user has admin role after login
+      navigate('/admin');
     }
     setIsLoading(false);
   };
@@ -107,7 +115,7 @@ const AdminLogin = () => {
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            Demo: admin@gamevault.com / admin123
+            Sign up first, then an admin can grant you access
           </p>
         </form>
       </motion.div>

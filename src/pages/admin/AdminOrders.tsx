@@ -26,22 +26,27 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { Order } from '@/hooks/useOrders';
 
 const AdminOrders = () => {
-  const { orders, updateOrderStatus } = useAdmin();
+  const { orders, ordersLoading, updateOrderStatus } = useAdmin();
   const [search, setSearch] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<typeof orders[0] | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const filteredOrders = orders.filter(
     (order) =>
-      order.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      order.customerEmail.toLowerCase().includes(search.toLowerCase()) ||
+      order.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+      order.customer_email.toLowerCase().includes(search.toLowerCase()) ||
       order.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleStatusChange = (orderId: string, status: 'pending' | 'completed' | 'refunded') => {
-    updateOrderStatus(orderId, status);
-    toast.success(`Order status updated to ${status}`);
+  const handleStatusChange = async (orderId: string, status: Order['status']) => {
+    try {
+      await updateOrderStatus(orderId, status);
+      toast.success(`Order status updated to ${status}`);
+    } catch (error) {
+      toast.error('Failed to update order status');
+    }
   };
 
   const exportOrders = () => {
@@ -49,12 +54,12 @@ const AdminOrders = () => {
       ['Order ID', 'Customer', 'Email', 'Items', 'Total', 'Status', 'Date'],
       ...orders.map((o) => [
         o.id,
-        o.customerName,
-        o.customerEmail,
+        o.customer_name,
+        o.customer_email,
         o.items.map((i) => i.gameTitle).join('; '),
         o.total.toFixed(2),
         o.status,
-        new Date(o.createdAt).toLocaleDateString(),
+        new Date(o.created_at).toLocaleDateString(),
       ]),
     ]
       .map((row) => row.join(','))
@@ -76,11 +81,22 @@ const AdminOrders = () => {
       case 'pending':
         return 'bg-yellow-500/20 text-yellow-500';
       case 'refunded':
+      case 'cancelled':
         return 'bg-destructive/20 text-destructive';
       default:
         return 'bg-muted text-muted-foreground';
     }
   };
+
+  if (ordersLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-2 border-neon-cyan border-t-transparent rounded-full" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -132,11 +148,11 @@ const AdminOrders = () => {
                   animate={{ opacity: 1 }}
                   className="border-b border-border"
                 >
-                  <TableCell className="font-mono text-sm">{order.id}</TableCell>
+                  <TableCell className="font-mono text-sm">{order.id.slice(0, 8)}...</TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{order.customerName}</p>
-                      <p className="text-xs text-muted-foreground">{order.customerEmail}</p>
+                      <p className="font-medium">{order.customer_name}</p>
+                      <p className="text-xs text-muted-foreground">{order.customer_email}</p>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -155,7 +171,7 @@ const AdminOrders = () => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {new Date(order.createdAt).toLocaleDateString()}
+                    {new Date(order.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -210,19 +226,19 @@ const AdminOrders = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Order ID</p>
-                    <p className="font-mono">{selectedOrder.id}</p>
+                    <p className="font-mono text-sm">{selectedOrder.id}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Date</p>
-                    <p>{new Date(selectedOrder.createdAt).toLocaleString()}</p>
+                    <p>{new Date(selectedOrder.created_at).toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Customer</p>
-                    <p>{selectedOrder.customerName}</p>
+                    <p>{selectedOrder.customer_name}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Email</p>
-                    <p>{selectedOrder.customerEmail}</p>
+                    <p>{selectedOrder.customer_email}</p>
                   </div>
                 </div>
 

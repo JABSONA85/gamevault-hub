@@ -5,7 +5,7 @@ import { useAdmin } from '@/context/AdminContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const AdminDashboard = () => {
-  const { games, orders } = useAdmin();
+  const { games, gamesLoading, orders, ordersLoading } = useAdmin();
 
   const totalRevenue = orders
     .filter((o) => o.status === 'completed')
@@ -55,6 +55,16 @@ const AdminDashboard = () => {
   ];
 
   const recentOrders = orders.slice(0, 5);
+
+  if (gamesLoading || ordersLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-2 border-neon-cyan border-t-transparent rounded-full" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -113,35 +123,39 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-muted/50"
-                  >
-                    <div>
-                      <p className="font-medium">{order.customerName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {order.items.length} item(s) • {new Date(order.createdAt).toLocaleDateString()}
-                      </p>
+                {recentOrders.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">No orders yet</p>
+                ) : (
+                  recentOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between p-4 rounded-lg bg-muted/50"
+                    >
+                      <div>
+                        <p className="font-medium">{order.customer_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order.items.length} item(s) • {new Date(order.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display font-bold text-neon-cyan">
+                          ${order.total.toFixed(2)}
+                        </p>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            order.status === 'completed'
+                              ? 'bg-neon-green/20 text-neon-green'
+                              : order.status === 'pending'
+                              ? 'bg-yellow-500/20 text-yellow-500'
+                              : 'bg-destructive/20 text-destructive'
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-display font-bold text-neon-cyan">
-                        ${order.total.toFixed(2)}
-                      </p>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          order.status === 'completed'
-                            ? 'bg-neon-green/20 text-neon-green'
-                            : order.status === 'pending'
-                            ? 'bg-yellow-500/20 text-yellow-500'
-                            : 'bg-destructive/20 text-destructive'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -161,7 +175,7 @@ const AdminDashboard = () => {
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-neon-green rounded-full"
-                      style={{ width: `${(completedOrders / totalOrders) * 100}%` }}
+                      style={{ width: `${totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0}%` }}
                     />
                   </div>
                 </div>
@@ -173,7 +187,7 @@ const AdminDashboard = () => {
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-yellow-500 rounded-full"
-                      style={{ width: `${(pendingOrders / totalOrders) * 100}%` }}
+                      style={{ width: `${totalOrders > 0 ? (pendingOrders / totalOrders) * 100 : 0}%` }}
                     />
                   </div>
                 </div>
@@ -188,8 +202,9 @@ const AdminDashboard = () => {
                     <div
                       className="h-full bg-destructive rounded-full"
                       style={{
-                        width: `${
-                          (orders.filter((o) => o.status === 'refunded').length / totalOrders) * 100
+                        width: `${totalOrders > 0 
+                          ? (orders.filter((o) => o.status === 'refunded').length / totalOrders) * 100 
+                          : 0
                         }%`,
                       }}
                     />
@@ -199,8 +214,8 @@ const AdminDashboard = () => {
 
               <div className="mt-8 p-4 rounded-xl bg-gradient-to-r from-neon-cyan/10 to-neon-magenta/10 border border-border">
                 <p className="text-sm text-muted-foreground mb-1">Top Selling Game</p>
-                <p className="font-display font-bold">God of War Ragnarök</p>
-                <p className="text-sm text-neon-cyan">$59.99 • 24 sales</p>
+                <p className="font-display font-bold">{games[0]?.title || 'No games yet'}</p>
+                <p className="text-sm text-neon-cyan">${games[0]?.price?.toFixed(2) || '0.00'}</p>
               </div>
             </CardContent>
           </Card>

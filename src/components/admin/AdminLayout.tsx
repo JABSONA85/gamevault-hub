@@ -1,14 +1,22 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
-import { useAdmin } from '@/context/AdminContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface AdminLayoutProps {
   children: ReactNode;
 }
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
-  const { isAdmin } = useAdmin();
+  const { isAdmin, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin w-8 h-8 border-2 border-neon-cyan border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return <Navigate to="/admin/login" replace />;

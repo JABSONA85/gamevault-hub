@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { TrendingUp, Users, DollarSign, ShoppingCart, Gamepad2, Star } from 'lucide-react';
+import { TrendingUp, DollarSign, ShoppingCart, Gamepad2, Star } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdmin } from '@/context/AdminContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,7 @@ import {
 } from 'recharts';
 
 const AdminAnalytics = () => {
-  const { games, orders } = useAdmin();
+  const { games, gamesLoading, orders, ordersLoading } = useAdmin();
 
   // Revenue data (mock)
   const revenueData = [
@@ -64,6 +64,20 @@ const AdminAnalytics = () => {
     .filter((o) => o.status === 'completed')
     .reduce((sum, o) => sum + o.total, 0);
 
+  const avgRating = games.length > 0 
+    ? games.reduce((sum, g) => sum + (g.rating || 0), 0) / games.length 
+    : 0;
+
+  if (gamesLoading || ordersLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-2 border-neon-cyan border-t-transparent rounded-full" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
       <div className="space-y-8">
@@ -81,7 +95,7 @@ const AdminAnalytics = () => {
             { title: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-neon-green' },
             { title: 'Total Orders', value: orders.length, icon: ShoppingCart, color: 'text-neon-cyan' },
             { title: 'Total Games', value: games.length, icon: Gamepad2, color: 'text-neon-magenta' },
-            { title: 'Avg Rating', value: (games.reduce((sum, g) => sum + g.rating, 0) / games.length).toFixed(1), icon: Star, color: 'text-yellow-400' },
+            { title: 'Avg Rating', value: avgRating.toFixed(1), icon: Star, color: 'text-yellow-400' },
           ].map((stat, index) => (
             <motion.div
               key={stat.title}
@@ -236,7 +250,7 @@ const AdminAnalytics = () => {
                     #{index + 1}
                   </span>
                   <img
-                    src={game.coverImage}
+                    src={game.image}
                     alt={game.title}
                     className="w-12 h-16 object-cover rounded"
                   />

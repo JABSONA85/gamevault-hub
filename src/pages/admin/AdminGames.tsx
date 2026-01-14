@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Pencil, Trash2, Search, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useAdmin } from '@/context/AdminContext';
-import { Game, Platform, Genre, platforms, genres } from '@/data/games';
+import { Game } from '@/hooks/useGames';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,30 +32,35 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
-const emptyGame: Omit<Game, 'id'> = {
+const platforms = ['PS4', 'PS5', 'Xbox One', 'Xbox Series X/S'];
+const genres = ['Action', 'RPG', 'Shooter', 'Sports', 'Adventure', 'Racing', 'Fighting', 'Horror', 'Simulation'];
+
+type GameFormData = Omit<Game, 'id' | 'created_at' | 'updated_at'>;
+
+const emptyGame: GameFormData = {
   title: '',
   description: '',
-  shortDescription: '',
   price: 0,
-  coverImage: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&q=80',
-  screenshots: [],
+  original_price: null,
+  image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&q=80',
   platform: 'PS5',
   genre: 'Action',
-  releaseDate: new Date().toISOString().split('T')[0],
+  release_date: new Date().toISOString().split('T')[0],
   publisher: '',
   developer: '',
   rating: 4.0,
-  featured: false,
-  bestseller: false,
-  newRelease: false,
+  is_featured: false,
+  is_new: false,
+  is_on_sale: false,
+  download_url: null,
 };
 
 const AdminGames = () => {
-  const { games, addGame, updateGame, deleteGame } = useAdmin();
+  const { games, gamesLoading, addGame, updateGame, deleteGame } = useAdmin();
   const [search, setSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
-  const [formData, setFormData] = useState<Omit<Game, 'id'>>(emptyGame);
+  const [formData, setFormData] = useState<GameFormData>(emptyGame);
 
   const filteredGames = games.filter((game) =>
     game.title.toLowerCase().includes(search.toLowerCase())
@@ -72,40 +77,47 @@ const AdminGames = () => {
     setFormData({
       title: game.title,
       description: game.description,
-      shortDescription: game.shortDescription,
       price: game.price,
-      originalPrice: game.originalPrice,
-      coverImage: game.coverImage,
-      screenshots: game.screenshots,
+      original_price: game.original_price,
+      image: game.image,
       platform: game.platform,
       genre: game.genre,
-      releaseDate: game.releaseDate,
+      release_date: game.release_date,
       publisher: game.publisher,
       developer: game.developer,
       rating: game.rating,
-      featured: game.featured,
-      bestseller: game.bestseller,
-      newRelease: game.newRelease,
+      is_featured: game.is_featured,
+      is_new: game.is_new,
+      is_on_sale: game.is_on_sale,
+      download_url: game.download_url,
     });
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingGame) {
-      updateGame(editingGame.id, formData);
-      toast.success('Game updated successfully!');
-    } else {
-      addGame(formData);
-      toast.success('Game added successfully!');
+    try {
+      if (editingGame) {
+        await updateGame(editingGame.id, formData);
+        toast.success('Game updated successfully!');
+      } else {
+        await addGame(formData);
+        toast.success('Game added successfully!');
+      }
+      setIsDialogOpen(false);
+    } catch (error) {
+      toast.error('Failed to save game');
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = (id: string, title: string) => {
+  const handleDelete = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      deleteGame(id);
-      toast.success('Game deleted successfully!');
+      try {
+        await deleteGame(id);
+        toast.success('Game deleted successfully!');
+      } catch (error) {
+        toast.error('Failed to delete game');
+      }
     }
   };
 
@@ -114,6 +126,16 @@ const AdminGames = () => {
     if (platform.includes('PS4')) return 'bg-blue-600';
     return 'bg-gradient-to-r from-green-500 to-emerald-600';
   };
+
+  if (gamesLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-2 border-neon-cyan border-t-transparent rounded-full" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -172,7 +194,7 @@ const AdminGames = () => {
                   >
                     <TableCell>
                       <img
-                        src={game.coverImage}
+                        src={game.image}
                         alt={game.title}
                         className="w-12 h-16 object-cover rounded"
                       />
@@ -253,7 +275,7 @@ const AdminGames = () => {
                   <Select
                     value={formData.platform}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, platform: value as Platform })
+                      setFormData({ ...formData, platform: value })
                     }
                   >
                     <SelectTrigger className="bg-muted">
@@ -274,7 +296,7 @@ const AdminGames = () => {
                   <Select
                     value={formData.genre}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, genre: value as Genre })
+                      setFormData({ ...formData, genre: value })
                     }
                   >
                     <SelectTrigger className="bg-muted">
@@ -306,16 +328,16 @@ const AdminGames = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="originalPrice">Original Price ($)</Label>
+                  <Label htmlFor="original_price">Original Price ($)</Label>
                   <Input
-                    id="originalPrice"
+                    id="original_price"
                     type="number"
                     step="0.01"
-                    value={formData.originalPrice || ''}
+                    value={formData.original_price || ''}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        originalPrice: e.target.value ? parseFloat(e.target.value) : undefined,
+                        original_price: e.target.value ? parseFloat(e.target.value) : null,
                       })
                     }
                     placeholder="Leave empty if no sale"
@@ -327,9 +349,8 @@ const AdminGames = () => {
                   <Label htmlFor="publisher">Publisher</Label>
                   <Input
                     id="publisher"
-                    value={formData.publisher}
+                    value={formData.publisher || ''}
                     onChange={(e) => setFormData({ ...formData, publisher: e.target.value })}
-                    required
                     className="bg-muted"
                   />
                 </div>
@@ -338,21 +359,19 @@ const AdminGames = () => {
                   <Label htmlFor="developer">Developer</Label>
                   <Input
                     id="developer"
-                    value={formData.developer}
+                    value={formData.developer || ''}
                     onChange={(e) => setFormData({ ...formData, developer: e.target.value })}
-                    required
                     className="bg-muted"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="releaseDate">Release Date</Label>
+                  <Label htmlFor="release_date">Release Date</Label>
                   <Input
-                    id="releaseDate"
+                    id="release_date"
                     type="date"
-                    value={formData.releaseDate}
-                    onChange={(e) => setFormData({ ...formData, releaseDate: e.target.value })}
-                    required
+                    value={formData.release_date || ''}
+                    onChange={(e) => setFormData({ ...formData, release_date: e.target.value })}
                     className="bg-muted"
                   />
                 </div>
@@ -365,41 +384,27 @@ const AdminGames = () => {
                     step="0.1"
                     min="0"
                     max="5"
-                    value={formData.rating}
+                    value={formData.rating || 0}
                     onChange={(e) =>
                       setFormData({ ...formData, rating: parseFloat(e.target.value) || 0 })
                     }
-                    required
                     className="bg-muted"
                   />
                 </div>
 
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="coverImage">Cover Image URL</Label>
+                  <Label htmlFor="image">Cover Image URL</Label>
                   <Input
-                    id="coverImage"
-                    value={formData.coverImage}
-                    onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
+                    id="image"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
                     required
                     className="bg-muted"
                   />
                 </div>
 
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="shortDescription">Short Description</Label>
-                  <Input
-                    id="shortDescription"
-                    value={formData.shortDescription}
-                    onChange={(e) =>
-                      setFormData({ ...formData, shortDescription: e.target.value })
-                    }
-                    required
-                    className="bg-muted"
-                  />
-                </div>
-
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="description">Full Description</Label>
+                  <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
                     value={formData.description}
@@ -413,33 +418,33 @@ const AdminGames = () => {
                 <div className="col-span-2 flex flex-wrap gap-6">
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      id="featured"
-                      checked={formData.featured}
+                      id="is_featured"
+                      checked={formData.is_featured || false}
                       onCheckedChange={(checked) =>
-                        setFormData({ ...formData, featured: checked === true })
+                        setFormData({ ...formData, is_featured: checked === true })
                       }
                     />
-                    <Label htmlFor="featured">Featured</Label>
+                    <Label htmlFor="is_featured">Featured</Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      id="bestseller"
-                      checked={formData.bestseller}
+                      id="is_on_sale"
+                      checked={formData.is_on_sale || false}
                       onCheckedChange={(checked) =>
-                        setFormData({ ...formData, bestseller: checked === true })
+                        setFormData({ ...formData, is_on_sale: checked === true })
                       }
                     />
-                    <Label htmlFor="bestseller">Bestseller</Label>
+                    <Label htmlFor="is_on_sale">On Sale</Label>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      id="newRelease"
-                      checked={formData.newRelease}
+                      id="is_new"
+                      checked={formData.is_new || false}
                       onCheckedChange={(checked) =>
-                        setFormData({ ...formData, newRelease: checked === true })
+                        setFormData({ ...formData, is_new: checked === true })
                       }
                     />
-                    <Label htmlFor="newRelease">New Release</Label>
+                    <Label htmlFor="is_new">New Release</Label>
                   </div>
                 </div>
               </div>

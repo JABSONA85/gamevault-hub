@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, User, Menu, X, Search, Gamepad2 } from 'lucide-react';
+import { ShoppingCart, User, Menu, X, Search, Gamepad2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { itemCount } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -121,9 +123,9 @@ const Header = () => {
             </Link>
 
             {/* User */}
-            <Link to="/auth">
+            <Link to={user ? "/vault" : "/auth"}>
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <User className="w-5 h-5" />
+                {user ? <User className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
               </Button>
             </Link>
 

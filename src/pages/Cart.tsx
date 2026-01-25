@@ -1,19 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Minus, Plus, ShoppingBag, ArrowLeft, CreditCard } from 'lucide-react';
+import { Trash2, Minus, Plus, ShoppingBag, ArrowLeft, CreditCard, LogIn } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
+import { useCreateOrder, OrderItem } from '@/hooks/useOrders';
 import { toast } from 'sonner';
 
 const Cart = () => {
   const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
+  const { user, profile } = useAuth();
+  const createOrder = useCreateOrder();
   const navigate = useNavigate();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [checkoutForm, setCheckoutForm] = useState({
     email: '',
     name: '',
@@ -22,17 +27,59 @@ const Cart = () => {
     cvv: '',
   });
 
+  // Pre-fill form with user data
+  useEffect(() => {
+    if (user && profile) {
+      setCheckoutForm(prev => ({
+        ...prev,
+        email: user.email || '',
+        name: profile.username || '',
+      }));
+    }
+  }, [user, profile]);
+
   const subtotal = cart.total;
   const tax = subtotal * 0.1;
   const total = subtotal + tax;
 
-  const handleCheckout = (e: React.FormEvent) => {
+  const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Order placed successfully!', {
-      description: 'Check your email for download links.',
-    });
-    clearCart();
-    navigate('/');
+    
+    if (!user) {
+      toast.error('Please sign in to complete your purchase');
+      navigate('/auth');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const orderItems: OrderItem[] = cart.items.map(item => ({
+        gameId: item.game.id,
+        gameTitle: item.game.title,
+        price: item.game.price,
+        quantity: item.quantity,
+      }));
+
+      await createOrder.mutateAsync({
+        user_id: user.id,
+        customer_name: checkoutForm.name,
+        customer_email: checkoutForm.email,
+        items: orderItems,
+        total: total,
+      });
+
+      toast.success('Order placed successfully!', {
+        description: 'Check your vault for download links.',
+      });
+      clearCart();
+      navigate('/vault');
+    } catch (error) {
+      console.error('Checkout error:', error);
+      toast.error('Failed to place order. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (cart.items.length === 0 && !isCheckingOut) {
@@ -244,9 +291,10 @@ const Cart = () => {
                   </Button>
                   <Button
                     type="submit"
+                    disabled={isProcessing}
                     className="flex-1 bg-gradient-to-r from-neon-cyan to-neon-magenta text-background"
                   >
-                    Complete Purchase
+                    {isProcessing ? 'Processing...' : 'Complete Purchase'}
                   </Button>
                 </div>
               </motion.form>
@@ -277,13 +325,24 @@ const Cart = () => {
               </div>
 
               {!isCheckingOut && (
-                <Button
-                  size="lg"
-                  onClick={() => setIsCheckingOut(true)}
-                  className="w-full bg-gradient-to-r from-neon-cyan to-neon-magenta text-background font-bold"
-                >
-                  Proceed to Checkout
-                </Button>
+                user ? (
+                  <Button
+                    size="lg"
+                    onClick={() => setIsCheckingOut(true)}
+                    className="w-full bg-gradient-to-r from-neon-cyan to-neon-magenta text-background font-bold"
+                  >
+                    Proceed to Checkout
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    onClick={() => navigate('/auth')}
+                    className="w-full bg-gradient-to-r from-neon-cyan to-neon-magenta text-background font-bold"
+                  >
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Sign In to Checkout
+                  </Button>
+                )
               )}
 
               <p className="text-xs text-center text-muted-foreground">

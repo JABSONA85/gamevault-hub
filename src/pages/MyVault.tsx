@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Download, 
@@ -11,7 +11,10 @@ import {
   ExternalLink,
   Check,
   X,
-  Loader2
+  Loader2,
+  Heart,
+  ShoppingCart,
+  Trash2
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -23,7 +26,10 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/AuthContext';
 import { useUserOrders } from '@/hooks/useOrders';
-import { useGames, Game } from '@/hooks/useGames';
+import { useGames, Game as DbGame } from '@/hooks/useGames';
+import { Game as DataGame, Genre, Platform } from '@/data/games';
+import { useWishlistWithGames, useRemoveFromWishlist } from '@/hooks/useWishlist';
+import { useCart } from '@/context/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -33,6 +39,7 @@ const MyVault = () => {
   const { user, profile, isLoading: authLoading, signOut } = useAuth();
   const { data: orders, isLoading: ordersLoading } = useUserOrders(user?.id);
   const { data: games } = useGames();
+  const { data: wishlistItems, isLoading: wishlistLoading } = useWishlistWithGames();
   
   const [profileForm, setProfileForm] = useState({
     username: profile?.username || '',
@@ -132,10 +139,14 @@ const MyVault = () => {
 
         {/* Main Tabs */}
         <Tabs defaultValue="games" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="games" className="gap-2">
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">My Games</span>
+            </TabsTrigger>
+            <TabsTrigger value="wishlist" className="gap-2">
+              <Heart className="w-4 h-4" />
+              <span className="hidden sm:inline">Wishlist</span>
             </TabsTrigger>
             <TabsTrigger value="orders" className="gap-2">
               <Package className="w-4 h-4" />
@@ -183,6 +194,50 @@ const MyVault = () => {
                     <div className="grid gap-4">
                       {purchasedGames.map((game) => (
                         <GameCard key={game.id} game={game} />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
+
+          {/* Wishlist Tab */}
+          <TabsContent value="wishlist">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Wishlist</CardTitle>
+                  <CardDescription>
+                    Games you've saved for later
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {wishlistLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-neon-cyan" />
+                    </div>
+                  ) : !wishlistItems?.length ? (
+                    <div className="text-center py-12">
+                      <Heart className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="font-semibold text-lg mb-2">Your wishlist is empty</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Save games you're interested in to buy later.
+                      </p>
+                      <Button 
+                        onClick={() => navigate('/shop')}
+                        className="bg-gradient-to-r from-neon-cyan to-neon-magenta text-background"
+                      >
+                        Browse Games
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {wishlistItems.map((item) => (
+                        <WishlistCard key={item.id} item={item} allGames={games || []} />
                       ))}
                     </div>
                   )}
@@ -383,7 +438,7 @@ const MyVault = () => {
 };
 
 // Game card component for purchased games
-const GameCard = ({ game }: { game: Game }) => {
+const GameCard = ({ game }: { game: DbGame }) => {
   return (
     <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-lg border bg-muted/50">
       <img
@@ -412,6 +467,120 @@ const GameCard = ({ game }: { game: Game }) => {
           ) : (
             <Badge variant="secondary">Coming Soon</Badge>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Wishlist card component
+interface WishlistGame {
+  id: string;
+  title: string;
+  price: number;
+  original_price: number | null;
+  image: string;
+  genre: string;
+  platform: string;
+  is_on_sale: boolean | null;
+}
+
+const WishlistCard = ({ item, allGames }: { item: { id: string; created_at: string; games: WishlistGame | null }; allGames: DbGame[] }) => {
+  const navigate = useNavigate();
+  const { addToCart } = useCart();
+  const removeFromWishlist = useRemoveFromWishlist();
+  const wishlistGame = item.games;
+  
+  if (!wishlistGame) return null;
+
+  // Find the full game object from games list and convert to cart format
+  const fullGame = allGames.find(g => g.id === wishlistGame.id);
+
+  const handleAddToCart = () => {
+    if (fullGame) {
+      // Convert DbGame to DataGame format for cart
+      const cartGame: DataGame = {
+        id: fullGame.id,
+        title: fullGame.title,
+        description: fullGame.description,
+        shortDescription: fullGame.description.slice(0, 100) + '...',
+        price: fullGame.price,
+        originalPrice: fullGame.original_price || undefined,
+        coverImage: fullGame.image,
+        screenshots: [],
+        platform: fullGame.platform as Platform,
+        genre: fullGame.genre as Genre,
+        releaseDate: fullGame.release_date || '',
+        publisher: fullGame.publisher || '',
+        developer: fullGame.developer || '',
+        rating: fullGame.rating || 0,
+        featured: fullGame.is_featured || false,
+        newRelease: fullGame.is_new || false,
+      };
+      addToCart(cartGame);
+      toast.success(`${wishlistGame.title} added to cart!`);
+    } else {
+      // Fallback: navigate to game page
+      navigate(`/game/${wishlistGame.id}`);
+    }
+  };
+
+  const handleRemove = async () => {
+    try {
+      await removeFromWishlist.mutateAsync(wishlistGame.id);
+      toast.success(`${wishlistGame.title} removed from wishlist`);
+    } catch (error) {
+      toast.error('Failed to remove from wishlist');
+    }
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-lg border bg-muted/50">
+      <Link to={`/game/${wishlistGame.id}`} className="shrink-0">
+        <img
+          src={wishlistGame.image}
+          alt={wishlistGame.title}
+          className="w-full sm:w-32 h-24 object-cover rounded-lg hover:opacity-80 transition-opacity"
+        />
+      </Link>
+      <div className="flex-1">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div>
+            <Link to={`/game/${wishlistGame.id}`}>
+              <h3 className="font-semibold hover:text-neon-cyan transition-colors">{wishlistGame.title}</h3>
+            </Link>
+            <p className="text-sm text-muted-foreground">{wishlistGame.genre} • {wishlistGame.platform}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="font-bold text-neon-cyan">${wishlistGame.price.toFixed(2)}</span>
+              {wishlistGame.original_price && (
+                <span className="text-sm text-muted-foreground line-through">
+                  ${wishlistGame.original_price.toFixed(2)}
+                </span>
+              )}
+              {wishlistGame.is_on_sale && (
+                <Badge variant="destructive" className="text-xs">Sale</Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm"
+              onClick={handleAddToCart}
+              className="bg-gradient-to-r from-neon-cyan to-neon-magenta text-background"
+            >
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Add to Cart
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleRemove}
+              disabled={removeFromWishlist.isPending}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

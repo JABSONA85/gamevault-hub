@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Game } from '@/data/games';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
+import WishlistButton from './WishlistButton';
 import { toast } from 'sonner';
 
 interface GameCardProps {
@@ -53,12 +54,27 @@ const GameCard = ({ game, index = 0 }: GameCardProps) => {
             {game.platform}
           </span>
 
-          {/* Sale Badge */}
-          {game.originalPrice && (
-            <span className="absolute top-3 right-3 px-2 py-1 text-xs font-bold bg-destructive text-destructive-foreground rounded">
-              -{Math.round((1 - game.price / game.originalPrice) * 100)}%
-            </span>
-          )}
+          {/* Wishlist Button */}
+          <div className="absolute top-3 right-3 z-10">
+            {game.originalPrice ? (
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-1 text-xs font-bold bg-destructive text-destructive-foreground rounded">
+                  -{Math.round((1 - game.price / game.originalPrice) * 100)}%
+                </span>
+                <WishlistButton 
+                  gameId={game.id} 
+                  gameTitle={game.title}
+                  className="bg-background/80 backdrop-blur-sm hover:bg-background"
+                />
+              </div>
+            ) : (
+              <WishlistButton 
+                gameId={game.id} 
+                gameTitle={game.title}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background"
+              />
+            )}
+          </div>
 
           {/* Quick Add Button */}
           <motion.div
